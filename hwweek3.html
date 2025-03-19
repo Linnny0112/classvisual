@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>城乡生育与死亡情况对比</title>
+  <style>
+    svg {
+      font: 10px sans-serif;
+    }
+
+   .axis path,
+   .axis line {
+      fill: none;
+      stroke: #000;
+      shape - rendering: crispEdges;
+    }
+
+   .bar {
+      fill: steelblue;
+    }
+
+   .x.axis path {
+      display: none;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="birthChart"></div>
+  <div id="deathChart"></div>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <script>
+    // 定义图表的尺寸
+    const margin = { top: 20, right: 20, bottom: 30, left: 40 };
+    const width = 960 - margin.left - margin.right;
+    const height = 500 - margin.top - margin.bottom;
+
+    // 加载出生人口数据
+    Promise.all([
+      d3.csv('/mnt/1-10 各地区分性别、月份的出生人口(2019.11.1-2020.10.31).xls', d3.dsvFormat(' ').parse),
+      d3.csv('/mnt/1-10a 各地区分性别、月份的出生人口(2019.11.1-2020.10.31)(城市).xls', d3.dsvFormat(' ').parse),
+      d3.csv('/mnt/1-10b 各地区分性别、月份的出生人口(2019.11.1-2020.10.31)(镇).xls', d3.dsvFormat(' ').parse),
+      d3.csv('/mnt/1-10c 各地区分性别、月份的出生人口(2019.11.1-2020.10.31)(乡村).xls', d3.dsvFormat(' ').parse)
+    ]).then(function (data) {
+      const allBirthData = data[0];
+      const cityBirthData = data[1];
+      const townBirthData = data[2];
+      const ruralBirthData = data[3];
+
+      // 处理数据并准备绘制堆积柱状图
+      const birthStackedData = stackBirthData(allBirthData, cityBirthData, townBirthData, ruralBirthData);
+
+      // 创建出生人口堆积柱状图
+      createStackedBarChart(birthStackedData, '#birthChart', '出生人口');
+    });
+
+    // 加载死亡人口数据
+    Promise.all([
+      d3.csv('/mnt/1-11 各地区分性别、月份的死亡人口(2019.11.1-2020.10.31).xls', d3.dsvFormat(' ').parse),
+      d3.csv('/mnt/1-11a 各地区分性别、月份的死亡人口(2019.11.1-2020.10.31)(城市).xls', d3.dsvFormat(' ').parse),
+      d3.csv('/mnt/1-11b 各地区分性别、月份的死亡人口(2019.11.1-2020.10.31)(镇).xls', d3.dsvFormat(' ').parse),
+      d3.csv('/mnt/1-11c 各地区分性别、月份的死亡人口(2019.11.1-2020.10.31)(乡村).xls', d3.dsvFormat(' ').parse)
+    ]).then(function (data) {
+      const allDeathData = data[0];
+      const cityDeathData = data[1];
+      const townDeathData = data[2];
+      const ruralDeathData = data[3];
+
+      // 处理数据并准备绘制堆积柱状图
+      const deathStackedData = stackDeathData(allDeathData, cityDeathData, townDeathData, ruralDeathData);
+
+      // 创建死亡人口堆积柱状图
+      createStackedBarChart(deathStackedData, '#deathChart', '死亡人口');
+    });
+
+    // 处理出生人口数据为堆叠格式
+    function stackBirthData(allData, cityData, townData, ruralData) {
+      // 这里需要根据数据结构进行具体的处理，假设数据结构包含地区、性别、月份和人口数量字段
+      // 示例代码，你需要根据实际情况修改
+      const keys = ['城市男性', '城市女性', '镇男性', '镇女性', '乡村男性', '乡村女性'];
+      const data = [];
+      allData.forEach((d, i) => {
+        const newD = {
+          month: d.month,
+          '城市男性': cityData[i].malePopulation,
+          '城市女性': cityData[i].femalePopulation,
+          '镇男性': townData[i].malePopulation,
+          '镇女性': townData[i].femalePopulation,
+          '乡村男性': ruralData[i].malePopulation,
+          '乡村女性': ruralData[i].femalePopulation
+        };
+        data.push(newD);
+      });
+      return d3.stack().keys(keys)(data);
+    }
+
+    // 处理死亡人口数据为堆叠格式
+    function stackDeathData(allData, cityData, townData, ruralData) {
+      // 与处理出生人口数据类似，根据实际数据结构修改
+      const keys = ['城市男性', '城市女性', '镇男性', '镇女性', '乡村男性', '乡村女性'];
+      const data = [];
+      allData.forEach((d, i) => {
+        const newD = {
+          month: d.month,
+          '城市男性': cityData[i].malePopulation,
+          '城市女性': cityData[i].femalePopulation,
+          '镇男性': townData[i].malePopulation,
+          '镇女性': townData[i].femalePopulation,
+          '乡村男性': ruralData[i].malePopulation,
+          '乡村女性': ruralData[i].femalePopulation
+        };
+        data.push(newD);
+      });
+      return d3.stack().keys(keys)(data);
+    }
+
+    // 创建堆积柱状图
+    function createStackedBarChart(stackedData, containerId, chartTitle) {
+      const x = d3.scaleBand()
+        .domain(stackedData[0].map(d => d.data.month))
+        .range([0, width])
+        .padding(0.2);
+
+      const y = d3.scaleLinear()
+        .domain([0, d3.max(stackedData, d => d3.max(d, d => d[1]))])
+        .nice()
+        .range([height, 0]);
+
+      const color = d3.scaleOrdinal()
+        .domain(stackedData.map(d => d.key))
+        .range(d3.schemeCategory10);
+
+      const svg = d3.select(containerId).append('svg')
+        .attr('width', width + margin.left + margin.right)
+        .attr('height', height + margin.top + margin.bottom)
+        .append('g')
+        .attr('transform', `translate(${margin.left},${margin.top})`);
+
+      svg.append('g')
+        .attr('class', 'axis x')
+        .attr('transform', `translate(0,${height})`)
+        .call(d3.axisBottom(x));
+
+      svg.append('g')
+        .attr('class', 'axis y')
+        .call(d3.axisLeft(y));
+
+      const groups = svg.selectAll('g.layer')
+        .data(stackedData)
+        .enter().append('g')
+        .attr('class', 'layer')
+        .style('fill', d => color(d.key));
+
+      groups.selectAll('rect')
+        .data(d => d)
+        .enter().append('rect')
+        .attr('x', d => x(d.data.month))
+        .attr('y', d => y(d[1]))
+        .attr('height', d => y(d[0]) - y(d[1]))
+        .attr('width', x.bandwidth());
+
+      svg.append('text')
+        .attr('x', width / 2)
+        .attr('y', 0 - (margin.top / 2))
+        .attr('text - anchor', 'middle')
+        .style('font - size', '16px')
+        .text(chartTitle);
+    }
+  </script>
+</body>
+
+</html>
